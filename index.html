@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Unjumble</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* VOICE: playful daily word game, calm enough to think in
+   IDEA: wooden letter tiles on a felt games table
+   PICTURE: the tile rack itself, big and centred
+   COLOUR and TYPE: deep teal felt, ivory tiles, coral for reveals, lime for solved; Rubik tiles, Inter body
+   LAYOUT: one column, clue above the rack, controls below */
+:root{color-scheme:light dark;--bg:light-dark(#0f5257,#0a3337);--bg2:light-dark(#0c4448,#072528);--ink:#f3f7f4;--mute:light-dark(#b9d4d0,#9dbcb8);--tile:#f6efe0;--tileInk:#1d2321;--edge:#c9b994;--coral:#ff7a59;--lime:#b8f05a;--card:light-dark(rgba(255,255,255,.09),rgba(255,255,255,.06))}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:radial-gradient(120% 80% at 50% 0%,var(--bg) 40%,var(--bg2));color:var(--ink);font:16px/1.55 Inter,system-ui,sans-serif;min-height:100vh;overflow-x:clip}
+main{max-width:560px;margin:0 auto;padding:18px 16px 40px;display:flex;flex-direction:column;gap:18px;min-height:100vh}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+h1{font:800 28px/1.05 Rubik,sans-serif;margin:0;letter-spacing:-.01em}
+.day{display:flex;align-items:center;gap:4px;color:var(--mute);font-size:14px}
+.day button{width:36px;height:36px}
+button{font:600 15px Inter,sans-serif;color:var(--ink);background:var(--card);border:1px solid rgba(255,255,255,.18);border-radius:12px;min-height:44px;padding:0 16px;cursor:pointer}
+button:focus-visible,.tile:focus-visible{outline:3px solid var(--lime);outline-offset:2px}
+button:disabled{opacity:.4;cursor:default}
+button.primary{background:var(--lime);color:#17300a;border-color:transparent;font-weight:700}
+.bar{display:flex;justify-content:space-between;align-items:center}
+.dots{display:flex;gap:8px}.dots span{width:28px;height:8px;border-radius:4px;background:rgba(255,255,255,.18)}
+.dots span.on{background:var(--ink)}.dots span.ok{background:var(--lime)}.dots span.gave{background:var(--coral)}
+.timer{font:700 26px/1 Rubik,sans-serif;font-variant-numeric:tabular-nums;white-space:nowrap}
+.timer small{font:500 13px Inter;color:var(--coral);margin-left:6px}
+.clue{background:var(--card);border-radius:18px;padding:16px 18px}
+.clue b{display:block;font-size:13px;color:var(--mute);font-weight:500;margin-bottom:4px}
+.clue p{margin:0;font:500 clamp(19px,5vw,23px)/1.3 Rubik,sans-serif;text-wrap:balance}
+.rack{position:relative;padding:22px 12px 26px;border-radius:20px;background:linear-gradient(#0000 70%,rgba(0,0,0,.25));}
+.rack::after{content:"";position:absolute;left:6px;right:6px;bottom:8px;height:12px;border-radius:6px;background:linear-gradient(#a3825a,#6e5232);box-shadow:0 6px 14px rgba(0,0,0,.35)}
+.tiles{display:grid;gap:clamp(5px,1.6vw,10px);justify-content:center}
+.tile{aspect-ratio:1;max-width:66px;width:100%;border:0;padding:0;border-radius:10px;background:linear-gradient(160deg,#fffaf0,var(--tile) 55%,#e7dcc2);color:var(--tileInk);font:800 clamp(22px,7vw,32px)/1 Rubik,sans-serif;box-shadow:0 3px 0 var(--edge),0 6px 12px rgba(0,0,0,.3);cursor:pointer;position:relative;transition:transform .15s,box-shadow .15s;user-select:none;-webkit-tap-highlight-color:transparent;min-height:0}
+.tile.sel{transform:translateY(-8px);box-shadow:0 3px 0 var(--edge),0 0 0 3px var(--lime),0 14px 18px rgba(0,0,0,.35)}
+.tile.lock{background:linear-gradient(160deg,#ffd9cc,#ffb79f);box-shadow:0 3px 0 #d9694c,0 6px 12px rgba(0,0,0,.3);cursor:default}
+.tile.lock::after{content:"";position:absolute;top:6px;right:6px;width:6px;height:6px;border-radius:50%;background:#b3432a}
+.tiles.won .tile{background:linear-gradient(160deg,#e4ffbc,var(--lime));box-shadow:0 3px 0 #7fb233,0 6px 12px rgba(0,0,0,.3);animation:hop .5s both}
+.tiles.gave .tile{background:linear-gradient(160deg,#fff,#d9d9d9);opacity:.85}
+@keyframes hop{40%{transform:translateY(-10px)}}
+.hint{color:var(--mute);font-size:14px;text-align:center;margin:-6px 0 0;min-height:22px}
+.controls{display:flex;gap:10px;flex-wrap:wrap}.controls button{flex:1 1 140px}
+.panel{background:var(--card);border-radius:20px;padding:20px;display:flex;flex-direction:column;gap:14px}
+.panel h2{font:700 24px/1.1 Rubik,sans-serif;margin:0}
+.panel p{margin:0}
+.rules{margin:0;padding-left:20px;color:var(--mute)}.rules li{margin:4px 0}.rules b{color:var(--ink)}
+table{width:100%;border-collapse:collapse;font-size:15px}td{padding:8px 0;border-bottom:1px solid rgba(255,255,255,.12)}td:last-child{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.big{font:800 clamp(40px,12vw,56px)/1 Rubik,sans-serif;font-variant-numeric:tabular-nums}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;text-align:center}
+.stats div{background:rgba(0,0,0,.15);border-radius:12px;padding:10px 4px}.stats strong{display:block;font:700 22px Rubik}.stats span{font-size:13px;color:var(--mute)}
+pre{background:rgba(0,0,0,.25);border-radius:12px;padding:12px;margin:0;font:14px/1.5 ui-monospace,monospace;white-space:pre-wrap}
+.note{font-size:13px;color:var(--mute);text-align:center;margin-top:auto}
+@media (prefers-reduced-motion:reduce){.tile{transition:none}.tiles.won .tile{animation:none}}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Unjumble</h1>
+    <div class="day"><span id="dayLbl">#1</span></div>
+  </header>
+  <div id="app"></div>
+  <p class="note">Prototype · 10 sample days of words and clues · one attempt per day</p>
+</main>
+<script>
+{
+const BANK=[
+ [["LIBRARY","Lending, with no interest charged"],["VOLCANO","A mountain with a temper"],["BLANKET","A statement that covers everything"]],
+ [["ICEBERG","Only its tip ever gets discussed"],["COMPASS","Its needle never sews"],["FORTUNE","Told by a stranger, or cracked open after dinner"]],
+ [["BALLOON","Full of hot air, yet the life of the party"],["CHIMNEY","Smoke’s exit, and one visitor’s entrance each December"],["DIAMOND","Forever, or where a batter stands"]],
+ [["MUSTARD","Some people can’t cut it"],["RAINBOW","A bow no archer can draw"],["HAMMOCK","A bed with no legs to stand on"]],
+ [["OCTOPUS","Inks without a pen"],["CAPTAIN","Wears the armband on match day"],["HISTORY","Written, they say, by the winners"]],
+ [["WHISTLE","You wet it with a drink"],["PYRAMID","A tomb, or a scheme to avoid"],["FEATHER","Birds of one flock together"]],
+ [["KITCHEN","Home to an island that never sees the sea"],["THUNDER","What a rival steals on your big day"],["FREEDOM","What a jailbreak is really after"]],
+ [["PUMPKIN","A carriage, briefly, until midnight"],["LUGGAGE","Carried around, at airports or emotionally"],["CURTAIN","Falls at the end of every play"]],
+ [["PENGUIN","Wears a dinner suit to work in the cold"],["MESSAGE","Arrives in a bottle, never in a glass"],["ORCHARD","Rows that pay their way in fruit"]],
+ [["SHADOWS","They follow you everywhere, but vanish at noon"],["CABBAGE","A head with no brain"],["JOURNEY","Apparently matters more than where it ends"]]
+];
+const REVEAL_COST=10,GIVEUP_COST=60,MAX_REVEALS=3;
+const EPOCH=Date.UTC(2026,10,26);
+const now=new Date();
+const todayNum=Math.floor((Date.UTC(now.getFullYear(),now.getMonth(),now.getDate())-EPOCH)/864e5)+1;
+const app=document.getElementById('app'),dayLbl=document.getElementById('dayLbl');
+let dayNum=Math.max(1,todayNum),S=null,tick=null;
+
+const store={get(){try{return JSON.parse(localStorage.getItem('unjumble')||'{}')}catch(e){return{}}},set(v){try{localStorage.setItem('unjumble',JSON.stringify(v))}catch(e){}}};
+function rng(seed){let h=1779033703^seed.length;for(const c of seed){h=Math.imul(h^c.charCodeAt(0),3432918353);h=h<<13|h>>>19}return()=>{h=Math.imul(h^h>>>16,2246822507);h=Math.imul(h^h>>>13,3266489909);h^=h>>>16;return(h>>>0)/4294967296}}
+function scramble(word,seed){const r=rng(seed);let a;let tries=0;do{a=word.split('');for(let i=a.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[a[i],a[j]]=[a[j],a[i]]}tries++}while(tries<50&&a.filter((c,i)=>c===word[i]).length>Math.floor(word.length/3));return a}
+const fmt=s=>{s=Math.round(s);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')};
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function load(n){
+  stop();dayNum=n;dayLbl.textContent='Puzzle #'+n;
+  const set=BANK[(n-1)%BANK.length];
+  S={day:n,words:set.map(([w,c],i)=>({word:w,clue:c,tiles:scramble(w,w+n+i),locked:[],reveals:0,time:0,penalty:0,status:'todo'})),idx:0,sel:-1,phase:'intro',start:0};
+  const done=store.get().results?.[n];
+  if(done){S.words.forEach((w,i)=>Object.assign(w,done[i],{tiles:w.word.split('')}));S.phase='done'}
+  render();
+}
+function cur(){return S.words[S.idx]}
+function elapsed(){const w=cur();return w.time+(S.start?(performance.now()-S.start)/1000:0)}
+function startClock(){S.start=performance.now();tick=setInterval(updTimer,250)}
+function stop(){if(tick)clearInterval(tick);tick=null;if(S&&S.start){cur().time+= (performance.now()-S.start)/1000;S.start=0}}
+function updTimer(){const t=document.getElementById('timer');if(t){const w=cur();t.innerHTML=fmt(elapsed()+w.penalty)+(w.penalty?'<small>+'+w.penalty+'s</small>':'')}}
+
+function render(){
+  if(S.phase==='intro')return renderIntro();
+  if(S.phase==='done')return renderDone();
+  const w=cur(),n=w.word.length,ended=w.status!=='todo';
+  app.innerHTML=`<div style="display:flex;flex-direction:column;gap:18px">
+   <div class="bar"><div class="dots">${S.words.map((x,i)=>`<span class="${x.status==='ok'?'ok':x.status==='gave'?'gave':i===S.idx?'on':''}"></span>`).join('')}</div>
+   <div class="timer" id="timer" aria-live="off"></div></div>
+   <div class="clue"><b>Clue · ${n} letters</b><p>${esc(w.clue)}</p></div>
+   <div class="rack"><div class="tiles ${w.status==='ok'?'won':w.status==='gave'?'gave':''}" style="grid-template-columns:repeat(${n},minmax(0,66px))">
+    ${w.tiles.map((c,i)=>`<button class="tile ${w.locked.includes(i)?'lock':''} ${S.sel===i?'sel':''}" data-i="${i}" aria-label="Letter ${esc(c)}, position ${i+1}${w.locked.includes(i)?', locked':''}" ${ended?'tabindex="-1"':''}>${esc(c)}</button>`).join('')}
+   </div></div>
+   <p class="hint" id="msg">${ended?(w.status==='ok'?'Solved in '+fmt(w.time+w.penalty)+'!':'The word was '+esc(w.word)+'.'):S.sel>=0?'Now tap the tile to swap with':'Tap two tiles to swap them'}</p>
+   <div class="controls">${ended?`<button class="primary" id="go">${S.idx<2?'Next word':'See results'}</button>`:
+     `<button id="rev" ${w.reveals>=MAX_REVEALS?'disabled':''}>Reveal a letter · ${MAX_REVEALS-w.reveals} left <span style="color:var(--coral)">+${REVEAL_COST}s</span></button><button id="give">Give up <span style="color:var(--coral)">+${GIVEUP_COST}s</span></button>`}</div>
+  </div>`;
+  updTimer();
+  app.querySelectorAll('.tile').forEach(b=>b.onclick=()=>tap(+b.dataset.i));
+  const g=document.getElementById('go');if(g){g.onclick=nextWord;g.focus()}
+  const r=document.getElementById('rev');if(r)r.onclick=reveal;
+  const gv=document.getElementById('give');if(gv)gv.onclick=giveUp;
+}
+function tap(i){
+  const w=cur();if(w.status!=='todo'||w.locked.includes(i))return;
+  if(S.sel<0){S.sel=i;render();focusTile(i);return}
+  if(S.sel===i){S.sel=-1;render();focusTile(i);return}
+  [w.tiles[S.sel],w.tiles[i]]=[w.tiles[i],w.tiles[S.sel]];S.sel=-1;check();render();focusTile(i);
+}
+function focusTile(i){const t=app.querySelector(`.tile[data-i="${i}"]`);if(t&&cur().status==='todo')t.focus()}
+function reveal(){
+  const w=cur();if(w.reveals>=MAX_REVEALS)return;
+  const i=w.word.split('').findIndex((c,k)=>!w.locked.includes(k)&&w.tiles[k]!==c);
+  if(i<0)return;
+  const j=w.tiles.findIndex((c,k)=>k!==i&&!w.locked.includes(k)&&c===w.word[i]&&w.tiles[k]!==w.word[k]);
+  const jj=j>=0?j:w.tiles.findIndex((c,k)=>k!==i&&!w.locked.includes(k)&&c===w.word[i]);
+  [w.tiles[i],w.tiles[jj]]=[w.tiles[jj],w.tiles[i]];
+  w.locked.push(i);w.reveals++;w.penalty+=REVEAL_COST;S.sel=-1;check();render();
+}
+function giveUp(){const w=cur();stop();w.tiles=w.word.split('');w.status='gave';w.penalty+=GIVEUP_COST;S.sel=-1;render()}
+function check(){const w=cur();if(w.tiles.join('')===w.word){stop();w.status='ok'}}
+function nextWord(){if(S.idx<2){S.idx++;S.sel=-1;render();startClock()}else finish()}
+function finish(){
+  S.phase='done';const st=store.get();st.results=st.results||{};
+  st.results[S.day]=S.words.map(w=>({time:w.time,penalty:w.penalty,reveals:w.reveals,status:w.status}));
+  store.set(st);render();
+}
+function renderIntro(){
+  app.innerHTML=`<div class="panel"><h2>Three words. One clock.</h2>
+   <ul class="rules"><li>Each word comes with a <b>clue</b>. Tap two tiles to <b>swap</b> them.</li>
+   <li>Stuck? <b>Reveal</b> puts one letter in its spot (up to 3, +${REVEAL_COST}s each).</li>
+   <li>Every word has 7 letters. <b>Lowest total time wins.</b></li></ul>
+   <button class="primary" id="start">Start puzzle #${S.day}</button></div>`;
+  const b=document.getElementById('start');b.onclick=()=>{S.phase='play';render();startClock()};b.focus();
+}
+function streak(res){let s=0,d=todayNum;if(!res[d])d--;while(d>0&&res[d]){s++;d--}return s}
+function renderDone(){
+  const total=S.words.reduce((a,w)=>a+w.time+w.penalty,0);
+  const res=store.get().results||{};const all=Object.values(res).map(r=>r.reduce((a,w)=>a+w.time+w.penalty,0));
+  const share=`Unjumble #${S.day} · ${fmt(total)}\n`+S.words.map(w=>`${w.status==='ok'?'🟩':'⬛'} ${w.word.length} letters · ${fmt(w.time+w.penalty)}${'💡'.repeat(w.reveals)}`).join('\n');
+  app.innerHTML=`<div class="panel"><p style="color:var(--mute)">Puzzle #${S.day} total</p><div class="big">${fmt(total)}</div>
+   <table>${S.words.map(w=>`<tr><td>${w.status==='ok'?'✓':'✕'} <b>${esc(w.word)}</b> <span style="color:var(--mute)">${w.reveals?w.reveals+' reveal'+(w.reveals>1?'s':''):''}${w.status==='gave'?' gave up':''}</span></td><td>${fmt(w.time+w.penalty)}</td></tr>`).join('')}</table>
+   <div class="stats"><div><strong>${all.length}</strong><span>Played</span></div><div><strong>${streak(res)}</strong><span>Streak</span></div><div><strong>${all.length?fmt(Math.min(...all)):'–'}</strong><span>Best</span></div></div>
+   <pre id="share">${esc(share)}</pre>
+   <div class="controls"><button class="primary" id="copy">Copy result</button></div><p style="text-align:center;color:var(--mute)">Next puzzle in <b id="cd" style="color:var(--ink);font-variant-numeric:tabular-nums"></b></p></div>`;
+  document.getElementById('copy').onclick=async e=>{try{await navigator.clipboard.writeText(share);e.target.textContent='Copied'}catch(_){e.target.textContent='Select the text above to copy'}};
+  const cd=document.getElementById('cd');const upd=()=>{const t=new Date(),m=new Date(t.getFullYear(),t.getMonth(),t.getDate()+1),d=Math.max(0,Math.floor((m-t)/1000));cd.textContent=String(Math.floor(d/3600)).padStart(2,'0')+':'+String(Math.floor(d/60)%60).padStart(2,'0')+':'+String(d%60).padStart(2,'0');if(!d)location.reload()};upd();tick=setInterval(upd,1000);
+}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&S&&S.sel>=0){S.sel=-1;render()}});
+document.addEventListener('visibilitychange',()=>{if(!S||S.phase!=='play'||cur().status!=='todo')return;if(document.hidden)stop();else if(!tick)startClock()});
+load(dayNum);
+}
+</script>
+</body>
+</html>
