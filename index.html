@@ -82,7 +82,9 @@ const BANK=[
  [["PENGUIN","Wears a dinner suit to work in the cold"],["MESSAGE","Arrives in a bottle, never in a glass"],["ORCHARD","Rows that pay their way in fruit"]],
  [["SHADOWS","They follow you everywhere, but vanish at noon"],["CABBAGE","A head with no brain"],["JOURNEY","Apparently matters more than where it ends"]]
 ];
-const REVEAL_COST=10,GIVEUP_COST=60,MAX_REVEALS=3;
+const MAX_PTS=100,PER_SEC=0.5,REVEAL_PTS=15,MIN_PTS=10,MAX_REVEALS=3;
+const pts=(w,t=w.time)=>w.status==='gave'?0:Math.max(MIN_PTS,Math.round(MAX_PTS-PER_SEC*t-REVEAL_PTS*w.reveals));
+const num=n=>n.toLocaleString('en-AU');
 const EPOCH=Date.UTC(2026,10,26);
 const now=new Date();
 const todayNum=Math.floor((Date.UTC(now.getFullYear(),now.getMonth(),now.getDate())-EPOCH)/864e5)+1;
@@ -107,7 +109,7 @@ function cur(){return S.words[S.idx]}
 function elapsed(){const w=cur();return w.time+(S.start?(performance.now()-S.start)/1000:0)}
 function startClock(){S.start=performance.now();tick=setInterval(updTimer,250)}
 function stop(){if(tick)clearInterval(tick);tick=null;if(S&&S.start){cur().time+= (performance.now()-S.start)/1000;S.start=0}}
-function updTimer(){const t=document.getElementById('timer');if(t){const w=cur();t.innerHTML=fmt(elapsed()+w.penalty)+(w.penalty?'<small>+'+w.penalty+'s</small>':'')}}
+function updTimer(){const t=document.getElementById('timer');if(t){const w=cur();t.innerHTML=fmt(elapsed())+'<small style="color:var(--lime)">'+num(pts(w,elapsed()))+' pts</small>'}}
 
 function render(){
   if(S.phase==='intro')return renderIntro();
@@ -120,9 +122,9 @@ function render(){
    <div class="rack"><div class="tiles ${w.status==='ok'?'won':w.status==='gave'?'gave':''}" style="grid-template-columns:repeat(${n},minmax(0,66px))">
     ${w.tiles.map((c,i)=>`<button class="tile ${w.locked.includes(i)?'lock':''} ${S.sel===i?'sel':''}" data-i="${i}" aria-label="Letter ${esc(c)}, position ${i+1}${w.locked.includes(i)?', locked':''}" ${ended?'tabindex="-1"':''}>${esc(c)}</button>`).join('')}
    </div></div>
-   <p class="hint" id="msg">${ended?(w.status==='ok'?'Solved in '+fmt(w.time+w.penalty)+'!':'The word was '+esc(w.word)+'.'):S.sel>=0?'Now tap the tile to swap with':'Tap two tiles to swap them'}</p>
+   <p class="hint" id="msg">${ended?(w.status==='ok'?'Solved in '+fmt(w.time)+' · +'+num(pts(w))+' points':'The word was '+esc(w.word)+'. 0 points.'):S.sel>=0?'Now tap the tile to swap with':'Tap two tiles to swap them'}</p>
    <div class="controls">${ended?`<button class="primary" id="go">${S.idx<2?'Next word':'See results'}</button>`:
-     `<button id="rev" ${w.reveals>=MAX_REVEALS?'disabled':''}>Reveal a letter · ${MAX_REVEALS-w.reveals} left <span style="color:var(--coral)">+${REVEAL_COST}s</span></button><button id="give">Give up <span style="color:var(--coral)">+${GIVEUP_COST}s</span></button>`}</div>
+     `<button id="rev" ${w.reveals>=MAX_REVEALS?'disabled':''}>Reveal · ${MAX_REVEALS-w.reveals} left <span style="color:var(--coral)">−${REVEAL_PTS}</span></button><button id="give">Give up <span style="color:var(--coral)">0 pts</span></button>`}</div>
   </div>`;
   updTimer();
   app.querySelectorAll('.tile').forEach(b=>b.onclick=()=>tap(+b.dataset.i));
@@ -144,9 +146,9 @@ function reveal(){
   const j=w.tiles.findIndex((c,k)=>k!==i&&!w.locked.includes(k)&&c===w.word[i]&&w.tiles[k]!==w.word[k]);
   const jj=j>=0?j:w.tiles.findIndex((c,k)=>k!==i&&!w.locked.includes(k)&&c===w.word[i]);
   [w.tiles[i],w.tiles[jj]]=[w.tiles[jj],w.tiles[i]];
-  w.locked.push(i);w.reveals++;w.penalty+=REVEAL_COST;S.sel=-1;check();render();
+  w.locked.push(i);w.reveals++;S.sel=-1;check();render();
 }
-function giveUp(){const w=cur();stop();w.tiles=w.word.split('');w.status='gave';w.penalty+=GIVEUP_COST;S.sel=-1;render()}
+function giveUp(){const w=cur();stop();w.tiles=w.word.split('');w.status='gave';S.sel=-1;render()}
 function check(){const w=cur();if(w.tiles.join('')===w.word){stop();w.status='ok'}}
 function nextWord(){if(S.idx<2){S.idx++;S.sel=-1;render();startClock()}else finish()}
 function finish(){
@@ -157,19 +159,20 @@ function finish(){
 function renderIntro(){
   app.innerHTML=`<div class="panel"><h2>Three words. One clock.</h2>
    <ul class="rules"><li>Each word comes with a <b>clue</b>. Tap two tiles to <b>swap</b> them.</li>
-   <li>Stuck? <b>Reveal</b> puts one letter in its spot (up to 3, +${REVEAL_COST}s each).</li>
-   <li>Every word has 7 letters. <b>Lowest total time wins.</b></li></ul>
+   <li>Every word has 7 letters and is worth up to <b>${num(MAX_PTS)} points</b>. You lose 1 point every 2 seconds.</li>
+   <li>Stuck? <b>Reveal</b> puts one letter in its spot (up to 3, −${REVEAL_PTS} each). Giving up scores 0.</li>
+   <li>Solve it and you keep at least ${MIN_PTS}. <b>Best of ${num(MAX_PTS*3)}.</b></li></ul>
    <button class="primary" id="start">Start puzzle #${S.day}</button></div>`;
   const b=document.getElementById('start');b.onclick=()=>{S.phase='play';render();startClock()};b.focus();
 }
 function streak(res){let s=0,d=todayNum;if(!res[d])d--;while(d>0&&res[d]){s++;d--}return s}
 function renderDone(){
-  const total=S.words.reduce((a,w)=>a+w.time+w.penalty,0);
-  const res=store.get().results||{};const all=Object.values(res).map(r=>r.reduce((a,w)=>a+w.time+w.penalty,0));
-  const share=`Unjumble #${S.day} · ${fmt(total)}\n`+S.words.map(w=>`${w.status==='ok'?'🟩':'⬛'} ${w.word.length} letters · ${fmt(w.time+w.penalty)}${'💡'.repeat(w.reveals)}`).join('\n');
-  app.innerHTML=`<div class="panel"><p style="color:var(--mute)">Puzzle #${S.day} total</p><div class="big">${fmt(total)}</div>
-   <table>${S.words.map(w=>`<tr><td>${w.status==='ok'?'✓':'✕'} <b>${esc(w.word)}</b> <span style="color:var(--mute)">${w.reveals?w.reveals+' reveal'+(w.reveals>1?'s':''):''}${w.status==='gave'?' gave up':''}</span></td><td>${fmt(w.time+w.penalty)}</td></tr>`).join('')}</table>
-   <div class="stats"><div><strong>${all.length}</strong><span>Played</span></div><div><strong>${streak(res)}</strong><span>Streak</span></div><div><strong>${all.length?fmt(Math.min(...all)):'–'}</strong><span>Best</span></div></div>
+  const total=S.words.reduce((a,w)=>a+pts(w),0),secs=S.words.reduce((a,w)=>a+w.time,0);
+  const res=store.get().results||{};const all=Object.values(res).map(r=>r.reduce((a,w)=>a+pts(w),0));
+  const share=`Unjumble #${S.day} · ${num(total)} pts · ${fmt(secs)}\n`+S.words.map(w=>`${w.status==='ok'?'🟩':'⬛'} ${num(pts(w))} · ${fmt(w.time)}${'💡'.repeat(w.reveals)}`).join('\n');
+  app.innerHTML=`<div class="panel"><p style="color:var(--mute)">Puzzle #${S.day} score</p><div class="big">${num(total)} <span style="font-size:.4em;color:var(--mute)">/ ${num(MAX_PTS*3)}</span></div><p style="color:var(--mute)">Total time ${fmt(secs)}</p>
+   <table>${S.words.map(w=>`<tr><td>${w.status==='ok'?'✓':'✕'} <b>${esc(w.word)}</b> <span style="color:var(--mute)">${w.reveals?w.reveals+' reveal'+(w.reveals>1?'s':''):''}${w.status==='gave'?' gave up':''}</span></td><td><span style="color:var(--mute)">${fmt(w.time)}</span> &nbsp;<b>${num(pts(w))}</b></td></tr>`).join('')}</table>
+   <div class="stats"><div><strong>${all.length}</strong><span>Played</span></div><div><strong>${streak(res)}</strong><span>Streak</span></div><div><strong>${all.length?num(Math.max(...all)):'–'}</strong><span>Best score</span></div></div>
    <pre id="share">${esc(share)}</pre>
    <div class="controls"><button class="primary" id="copy">Copy result</button></div><p style="text-align:center;color:var(--mute)">Next puzzle in <b id="cd" style="color:var(--ink);font-variant-numeric:tabular-nums"></b></p></div>`;
   document.getElementById('copy').onclick=async e=>{try{await navigator.clipboard.writeText(share);e.target.textContent='Copied'}catch(_){e.target.textContent='Select the text above to copy'}};
